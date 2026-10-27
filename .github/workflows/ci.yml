@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install linters
+        run: sudo apt-get update && sudo apt-get install -y shellcheck desktop-file-utils appstream
+      - name: Shell scripts
+        run: |
+          shellcheck install.sh uninstall.sh
+          bash -n packaging/arch/PKGBUILD
+      - name: Desktop entry
+        run: desktop-file-validate data/io.github.oreo1298.OpenMine.desktop
+      - name: AppStream metadata
+        run: appstreamcli validate --no-net data/io.github.oreo1298.OpenMine.metainfo.xml
+
+  test:
+    name: test (${{ matrix.os }}, Python ${{ matrix.python }}, ${{ matrix.pyside }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, python: "3.13", pyside: "PySide6-Essentials" }
+          # Oldest supported Qt for Python
+          - { os: ubuntu-latest, python: "3.11", pyside: "PySide6-Essentials==6.5.*" }
+          - { os: windows-latest, python: "3.13", pyside: "PySide6-Essentials" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - name: Install dependencies
+        run: python -m pip install "${{ matrix.pyside }}" pytest
+      - name: Run tests
+        run: python -m pytest -v
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+  install-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y python3-venv libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - name: Install
+        run: ./install.sh
+      - name: Run the installed game
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          test -x ~/.local/bin/openmine
+          ~/.local/bin/openmine --version
+          status=0; timeout 10 ~/.local/bin/openmine || status=$?
+          test "$status" -eq 124  # still running when stopped = started fine
+      - name: Update in place
+        run: ./install.sh
+      - name: Uninstall
+        run: |
+          ~/.local/lib/openmine/uninstall.sh --yes
+          test ! -e ~/.local/bin/openmine
+          test ! -e ~/.local/lib/openmine
+          test ! -e ~/.local/share/applications/io.github.oreo1298.OpenMine.desktop
+
+  python-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Read version
+        shell: bash
+        run: echo "VERSION=$(python -c 'import sys; sys.path.insert(0, "src"); import openmine; print(openmine.__version__)')" >> "$GITHUB_ENV"
+      - name: Install build tools
+        run: python -m pip install pyinstaller PySide6-Essentials
+      - name: Build with PyInstaller
+        run: pyinstaller --noconfirm packaging/windows/openmine.spec
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $p = Start-Process -FilePath dist\OpenMine\OpenMine.exe -PassThru
+          Start-Sleep -Seconds 10
+          if ($p.HasExited) { throw "OpenMine.exe exited early with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id
+      - name: Portable zip
+        shell: pwsh
+        run: Compress-Archive -Path dist\OpenMine -DestinationPath "dist\OpenMine-$env:VERSION-windows-portable.zip"
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc "/DAppVersion=$env:VERSION" packaging\windows\openmine.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/OpenMine-*-windows-setup.exe
+            dist/OpenMine-*-windows-portable.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [lint, test, install-script, python-dist, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l artifacts
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" artifacts/* --generate-notes --title "OpenMine ${TAG#v}" --repo "$GITHUB_REPOSITORY"
+          fi

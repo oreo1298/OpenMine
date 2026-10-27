@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.oreo1298.OpenMine</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>OpenMine</name>
+  <summary>Clear the minefield without setting off a mine</summary>
+  <developer id="io.github.oreo1298">
+    <name>OpenMine contributors</name>
+  </developer>
+  <description>
+    <p>
+      OpenMine is a free and open source take on the classic Minesweeper puzzle.
+      It follows your desktop's light or dark style and accent colour, and plays
+      well with a mouse, a keyboard or a touch screen.
+    </p>
+    <ul>
+      <li>Beginner, Intermediate, Expert and custom boards</li>
+      <li>The first click is always safe and opens up an area</li>
+      <li>Optional no-guess boards that can always be solved with logic</li>
+      <li>Hints that point at a provably safe square</li>
+      <li>Chording, flags and optional question marks</li>
+      <li>Statistics with best times and winning streaks</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.oreo1298.OpenMine.desktop</launchable>
+  <url type="homepage">https://github.com/oreo1298/OpenMine</url>
+  <url type="bugtracker">https://github.com/oreo1298/OpenMine/issues</url>
+  <url type="vcs-browser">https://github.com/oreo1298/OpenMine</url>
+  <provides>
+    <binary>openmine</binary>
+  </provides>
+  <categories>
+    <category>Game</category>
+    <category>LogicGame</category>
+  </categories>
+  <keywords>
+    <keyword>minesweeper</keyword>
+    <keyword>mines</keyword>
+    <keyword>puzzle</keyword>
+  </keywords>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Playing an Intermediate game in the light style</caption>
+      <image>https://raw.githubusercontent.com/oreo1298/OpenMine/main/docs/screenshots/light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The dark style follows your desktop</caption>
+      <image>https://raw.githubusercontent.com/oreo1298/OpenMine/main/docs/screenshots/dark.png</image>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#99c1f1</color>
+    <color type="primary" scheme_preference="dark">#1a5fb4</color>
+  </branding>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-10-27">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

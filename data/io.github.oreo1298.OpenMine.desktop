@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=OpenMine
+GenericName=Minesweeper
+Comment=Clear the minefield without setting off a mine
+Exec=openmine
+Icon=io.github.oreo1298.OpenMine
+Terminal=false
+Categories=Game;LogicGame;
+Keywords=minesweeper;mines;puzzle;logic;board;
+StartupNotify=true
+StartupWMClass=OpenMine
+SingleMainWindow=true
