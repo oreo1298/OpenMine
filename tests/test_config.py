@@ -94,7 +94,7 @@ def test_stats_records_and_ranks(tmp_path):
     assert record.best_streak == 3
     assert record.best_time == 20.0
     assert [t["time"] for t in record.times] == [20.0, 25.0, 30.0]
-    assert record.average_time == (30 + 20 + 25 + 10) / 4
+    assert record.average_time == (30 + 20 + 25) / 3  # the assisted win doesn't count
 
 
 def test_stats_keep_top_times_only(tmp_path):
@@ -140,3 +140,24 @@ def test_format_time():
     assert format_time(None) == "—"
     assert format_time(9.94) == "9.9 s"
     assert format_time(75.25) == "1:15.2"
+
+
+def test_format_time_never_shows_60_seconds():
+    assert format_time(59.96) == "1:00.0"
+    assert format_time(119.96) == "2:00.0"
+    assert format_time(59.94) == "59.9 s"
+
+
+def test_average_time_ignores_assisted_wins(tmp_path):
+    stats = Stats(tmp_path / "stats.json")
+    stats.record_game("beginner", True, 10.0)
+    stats.record_game("beginner", True, 100.0, counts_for_times=False)
+    record = stats.get("beginner")
+    assert record.won == 2
+    assert record.average_time == 10.0
+
+
+def test_stats_with_records_list_do_not_crash(tmp_path):
+    path = tmp_path / "stats.json"
+    path.write_text(json.dumps({"records": []}))
+    assert Stats(path).keys() == []

@@ -10,6 +10,7 @@ from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QGuiApplication,
     QInputDevice,
     QKeyEvent,
     QMouseEvent,
@@ -78,6 +79,7 @@ class BoardWidget(QWidget):
         self._right = False
         self._chording = False
         self._swallow_release = False
+        self._resumed_at = -1e9
         self._paused = False
         self._last_action = 0
 
@@ -334,7 +336,13 @@ class BoardWidget(QWidget):
             return
         if self._paused:
             self._swallow_release = True
+            self._resumed_at = time.monotonic()
             self.resume_requested.emit()
+            return
+        if self._just_resumed():
+            # The second half of a double click that resumed the game must not
+            # act on a board the player couldn't see.
+            self._swallow_release = True
             return
         self._show_cursor = False
         cell = self.cell_at(event.position())
@@ -410,6 +418,10 @@ class BoardWidget(QWidget):
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         self.mousePressEvent(event)
 
+    def _just_resumed(self) -> bool:
+        interval = QGuiApplication.styleHints().mouseDoubleClickInterval() / 1000
+        return time.monotonic() - self._resumed_at < interval
+
     def _on_long_press(self) -> None:
         if self._left and self._long_press_cell >= 0:
             self.mark(self._long_press_cell)
@@ -466,6 +478,10 @@ class BoardWidget(QWidget):
             return
         if self._paused:
             return super().keyPressEvent(event)
+        if event.isAutoRepeat() and key in (
+            Qt.Key.Key_Space, Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_F
+        ):
+            return  # holding a key must not flip flags or chord repeatedly
         if key in (Qt.Key.Key_Space, Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._show_cursor = True
             self.act(self._cursor)

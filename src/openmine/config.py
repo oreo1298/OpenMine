@@ -124,7 +124,8 @@ class Record:
     won: int = 0
     streak: int = 0
     best_streak: int = 0
-    total_win_time: float = 0.0
+    total_win_time: float = 0.0  # only wins without hints
+    timed_wins: int = 0
     times: list = field(default_factory=list)  # [{"time": float, "date": str}], fastest first
 
     @property
@@ -137,14 +138,15 @@ class Record:
 
     @property
     def average_time(self) -> Optional[float]:
-        return self.total_win_time / self.won if self.won else None
+        return self.total_win_time / self.timed_wins if self.timed_wins else None
 
 
 class Stats:
     def __init__(self, path: Optional[Path] = None) -> None:
         self.path = path or config_dir() / "stats.json"
         self.records: dict[str, Record] = {}
-        for key, raw in _load(self.path).get("records", {}).items():
+        records = _load(self.path).get("records")
+        for key, raw in (records if isinstance(records, dict) else {}).items():
             if not isinstance(raw, dict):
                 continue
             record = Record()
@@ -171,8 +173,9 @@ class Stats:
             record.won += 1
             record.streak += 1
             record.best_streak = max(record.best_streak, record.streak)
-            record.total_win_time += seconds
             if counts_for_times:
+                record.total_win_time += seconds
+                record.timed_wins += 1
                 entry = {"time": round(seconds, 3), "date": time.strftime("%Y-%m-%d %H:%M")}
                 record.times.append(entry)
                 record.times.sort(key=lambda t: t["time"])
@@ -216,6 +219,7 @@ def describe_key(key: str) -> str:
 def format_time(seconds: Optional[float]) -> str:
     if seconds is None:
         return "—"
+    seconds = round(seconds, 1)
     if seconds < 60:
         return f"{seconds:.1f} s"
     minutes, secs = divmod(seconds, 60)

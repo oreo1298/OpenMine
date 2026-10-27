@@ -53,8 +53,8 @@ class Solver:
         self.state[i] = SAFE
         self.counts[i] = count
         self.unknown -= 1
-        if count:
-            self.frontier.add(i)
+        # Zeros matter too: a player's (wrong) flag can stop the cascade next to one.
+        self.frontier.add(i)
 
     def add_mine(self, i: int) -> None:
         if self.state[i] != UNKNOWN:

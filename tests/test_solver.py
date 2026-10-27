@@ -133,8 +133,27 @@ def test_hint_returns_none_for_a_coin_flip():
 
 
 def test_global_mine_count_rule():
-    solver = Solver(neighbor_table(3, 3), 2)
-    for i in range(7):
-        solver.add_safe(i, 0)
-    safe, mines = solver.step()
-    assert mines == {7, 8}
+    # Nothing revealed, but every unknown square must be a mine...
+    solver = Solver(neighbor_table(2, 1), 2)
+    assert solver.step() == (set(), {0, 1})
+    # ...or, with all mines found, every unknown square is safe.
+    solver = Solver(neighbor_table(3, 1), 1)
+    solver.add_mine(0)
+    assert solver.step() == ({1, 2}, set())
+
+
+def test_hint_spots_wrong_flag_next_to_a_zero():
+    # The player flagged a safe square before the cascade reached it, so the
+    # cascade stopped there. Only the neighbouring 0 proves the flag wrong.
+    game = Game.from_layout(
+        """
+        ...*..*
+        ...*...
+        ...*...
+        """
+    )
+    flag = game.index(0, 1)
+    game.cycle_mark(flag)
+    game.reveal(0)
+    assert game.status == Status.PLAYING
+    assert find_hint(game) == (flag, "wrong-flag")

@@ -4,8 +4,8 @@ import pytest
 
 pytest.importorskip("PySide6.QtWidgets")
 
-from PySide6.QtCore import QPoint, Qt  # noqa: E402
-from PySide6.QtGui import QPalette  # noqa: E402
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt  # noqa: E402
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QPalette  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -188,6 +188,40 @@ def test_hint_and_pause(window):
     assert not game.paused
     assert game.cells[cell] != Cell.REVEALED
     window.grab()
+
+
+def test_double_click_on_paused_board_only_resumes(window):
+    game = use_layout(window, WALL)
+    click(window.board, 0)
+    window.toggle_pause()
+    target = game.index(6, 4)  # hidden, on the far side of the wall
+    assert game.cells[target] == Cell.HIDDEN
+    center = QPointF(window.board.cell_rect(target).center())
+    left, none = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
+    # What a real double click delivers: press, release, double-click, release.
+    for kind, buttons in (
+        (QEvent.Type.MouseButtonPress, left),
+        (QEvent.Type.MouseButtonRelease, none),
+        (QEvent.Type.MouseButtonDblClick, left),
+        (QEvent.Type.MouseButtonRelease, none),
+    ):
+        event = QMouseEvent(kind, center, center, left, buttons, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(window.board, event)
+    assert not game.paused
+    assert game.cells[target] == Cell.HIDDEN
+
+
+def test_held_keys_do_not_repeat_actions(window):
+    game = use_layout(window, LAYOUT)
+    board = window.board
+    board.setFocus()
+    QTest.keyClick(board, Qt.Key.Key_Left)  # show the cursor
+    cell = board._cursor
+    QTest.keyClick(board, Qt.Key.Key_F)
+    assert game.cells[cell] == Cell.FLAGGED
+    repeat = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F, Qt.KeyboardModifier.NoModifier, "f", True)
+    QApplication.sendEvent(board, repeat)
+    assert game.cells[cell] == Cell.FLAGGED
 
 
 def test_difficulty_switch(window):
